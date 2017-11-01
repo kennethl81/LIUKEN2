@@ -16,11 +16,13 @@ function StartScript()
 {
 
     Write-Host 'Please run this script with administrative control of PowerShell or PowerShell ISE'
-
-    Write-Host 'To login, this script will prompt you for email and password to goodreads.com'
+    Write-Host 'Ensure that Internet Explorer has been through its "first use" configuration'
+    Write-Host 'To login, this script will prompt you for your email and password to goodreads.com'
     doInputPrompt
 
-   $ieObject = New-Object -com InternetExplorer.Application
+    $ieObject = New-Object -com InternetExplorer.Application
+    Write-Host 'Opening IE Process'
+
    $check = DoWebAuthentication($ieObject)
     Do
     {
@@ -83,7 +85,6 @@ function DoWebAuthentication($ie)
     if($ie -ne $null) 
     {
         Write-Host 'Attempting to Authenticate...'
-        Write-Host 'Opening IE Process'
 
         $ie.visible=$global:IEVisible
 
@@ -171,6 +172,8 @@ function WaitForPageToLoad($ie)
 
 function DoSignOut($ie)
 {
+    Write-Host 'Signing out of goodreads.com account'
+
     if($ie -ne $null)
     {
         if(CheckConnection "https://www.goodreads.com/user/sign_out")

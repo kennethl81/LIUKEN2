@@ -24,13 +24,12 @@ Next install ISEPester:
 
 Restart PowerShell ISE in administrator mode
 
-+=========================================================
+=========================================================
 The Tests developed through TDD:
 -Try a connection to a URL
 -Check to see if the user can access and write to a directory
 -Check to see if we can validate an email address input by the user
 -Check to see if we can convert data to JSON (for output)
-+=========================================================
 
 How to use:
 
