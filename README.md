@@ -1,8 +1,8 @@
 # LIUKEN2
 Code Challenge #2
 
-===================================================
 Installation
+===================================================
 
 This script is using the PowerShell Pester Unit testing framework. While not required to run this script. Installation instructions are below:
 Use this link for a detailed setup guide for Pester unit test:
@@ -30,8 +30,8 @@ The Tests developed through TDD:
 -Check to see if we can validate an email address input by the user
 -Check to see if we can convert data to JSON (for output)
 
-How to use:
-
+How to Use
+===================================================
 !VERY IMPORTANT!
 Prior to running the script, ensure that Internet Explorer was initialized and used previously. The script may be blocked by Internet Explorer running if it requires the user to specify
 their start up (first-use) settings.
