@@ -3,13 +3,21 @@ $global:password = "" #reference to password
 $global:saveLocation = "C:\GoodReads_Mark_Twain_Quotes_$(Get-Date -f yyyy-mm-dd-hh-ss-ms).txt"
 $global:quotesToGet = 10 #limits the number of quotes to retrieve
 $global:JSONEscaped = $false #set to $true to keep JSON escaped, $false to unescape
-$global:IEVisible = $true #set to $true if you would like the IE browser to physically open, set to $false to run in the background
+$global:IEVisible = $false #set to $true if you would like the IE browser to physically open, set to $false to run in the background
 $global:testMode = $false #set to $true to use default login information, set to $false to prompt user to input login information
+
+<#IMPORTANT#>
+#Please run this script with administrative control of PowerShell or PowerShell ISE
+#If script execution is blocked, use this command to enable it: Set-ExecutionPolicy RemoteSigned
+
 
 #starts the workflow of the script
 function StartScript()
 {
-    Write-Output 'To login, this script will prompt you for email and password to goodreads.com'
+
+    Write-Host 'Please run this script with administrative control of PowerShell or PowerShell ISE'
+
+    Write-Host 'To login, this script will prompt you for email and password to goodreads.com'
     doInputPrompt
 
    $ieObject = New-Object -com InternetExplorer.Application
@@ -34,7 +42,6 @@ function StartScript()
         
         if($dataConvertToJSON)
         {
-            Write-Output "Writing file to: $global:saveLocation"
             WriteFileToDirectory $dataConvertToJSON $global:saveLocation
 
             DoSignOut($ieObject)
@@ -75,7 +82,9 @@ function DoWebAuthentication($ie)
 {
     if($ie -ne $null) 
     {
-        
+        Write-Host 'Attempting to Authenticate...'
+        Write-Host 'Opening IE Process'
+
         $ie.visible=$global:IEVisible
 
         if(CheckConnection "https://www.goodreads.com/") 
@@ -87,6 +96,8 @@ function DoWebAuthentication($ie)
             $checkForSignInButton = $ie.document.getElementsByTagName("form") | ? {$_.id -eq 'sign_in'}
 
             if($checkForSignInButton -eq $null) {
+
+                Write-Host 'There was a previous session still logged on. Triggering sign out of other account so we can log in with the newer supplied credentials'
                 DoSignOut($ie)  
             }
 
@@ -113,6 +124,7 @@ function DoWebAuthentication($ie)
                             } 
                             else 
                             {
+                                Write-Host 'Authenticated'
                                 #once authenticated, return $ie to be used in other functions
                                 return $true
                             }
@@ -126,6 +138,8 @@ function DoWebAuthentication($ie)
 #pre-condition: $ie is not null
 function CloseIEBrowserProcess($ie) 
 {
+    Write-Host 'Closing background IE process'
+
     if($ie -ne $null) 
     {
         $ie.Quit()
@@ -187,7 +201,7 @@ function LookForMarkTwainQuotes($ie)
 {
     if($ie -ne $null)
     {
-        Write-Output "Retrieving data..."
+        Write-Host "Retrieving data please wait..."
 
         if(CheckConnection "https://www.goodreads.com/search?q=mark+twain&search%5Bsource%5D=goodreads&search_type=quotes&tab=quotes")
         {
@@ -218,6 +232,9 @@ function LookForMarkTwainQuotes($ie)
 
             #sort results
             $data = $data.GetEnumerator() | Sort-Object -Property { [int]$_.key }
+
+            Write-Host 'Data Retrieved:' ($data | Out-String)
+
             return $data
         }
         
@@ -264,6 +281,9 @@ function CheckConnection([string]$data)
 #pre-condition: $data is not null
 function WriteFileToDirectory($data, $fileNameAndPath)
 {
+
+    Write-Host 'Writing data...'
+
     if($data -ne $null -and $global:JSONEscaped) 
     {
         $data | Out-File $fileNameAndPath
@@ -272,12 +292,16 @@ function WriteFileToDirectory($data, $fileNameAndPath)
     {
         $data |  %{ [System.Text.RegularExpressions.Regex]::Unescape($_) } | Out-File $fileNameAndPath
     }
+
+    Write-Output "File saved as: $global:saveLocation"
 }
 
 #converts data in JSON format, returns $null if $data is null
 #pre-condition: $data is not null
 function ConvertDataToJSON($data) 
 {
+    Write-Host 'Converting data to JSON for output'
+
     if($data -ne $null)
     {
         return $data | ConvertTo-JSON
