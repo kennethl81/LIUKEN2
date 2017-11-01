@@ -51,8 +51,9 @@ How to Use
         Set-ExecutionPolicy RemoteSigned
 
 If you do not have an account to goodreads.com please use my account when running the script:
-    email: kennethl81@gmail.com
-    password expedia
+        
+        email: kennethl81@gmail.com
+        password expedia
     
 Unit tests:
 
