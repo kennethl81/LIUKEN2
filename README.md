@@ -50,7 +50,10 @@ How to Use
     Use this command to allow running scripts on your system:
         Set-ExecutionPolicy RemoteSigned
 
-
+If you do not have an account to goodreads.com please use my account when running the script:
+    email: kennethl81@gmail.com
+    password expedia
+    
 Unit tests:
 
     Unit tests are run first automatically every time the script is executed.
