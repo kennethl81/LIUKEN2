@@ -3,7 +3,7 @@ $global:password = "" #reference to password
 $global:saveLocation = "C:\GoodReads_Mark_Twain_Quotes_$(Get-Date -f yyyy-mm-dd-hh-ss-ms).txt"
 $global:quotesToGet = 10 #limits the number of quotes to retrieve
 $global:JSONEscaped = $false #set to $true to keep JSON escaped, $false to unescape
-$global:IEVisible = $false #set to $true if you would like the IE browser to physically open, set to $false to run in the background
+$global:IEVisible = $true #set to $true if you would like the IE browser to physically open, set to $false to run in the background
 $global:testMode = $false #set to $true to use default login information, set to $false to prompt user to input login information
 
 #starts the workflow of the script
@@ -12,31 +12,35 @@ function StartScript()
     Write-Output 'To login, this script will prompt you for email and password to goodreads.com'
     doInputPrompt
 
-    $ieObject = DoWebAuthentication
-
-    if($ieObject -eq $null) 
+   $ieObject = New-Object -com InternetExplorer.Application
+   $check = DoWebAuthentication($ieObject)
+    Do
     {
-        doInputPrompt
-        $ieObject = DoWebAuthentication
-    } 
-    else 
-    {
-       Write-Output "Retrieving data..."
-       $data =  LookForMarkTwainQuotes($ieObject)
+        if($ieObject.LocationURL -ne 'https://www.goodreads.com/') { #if we can reach the homepage after calling the authentication function, then it means we are authenticated
+            Write-Output "Authentication failed. Please try again."
+            doInputPrompt
+            $check = DoWebAuthentication($ieObject)
+        }
 
-       if($data -ne $null)
-       {
-            $dataConvertToJSON = ConvertDataToJSON($data)
+    }
+    Until($true -eq $check)
+
+
+    $data =  LookForMarkTwainQuotes($ieObject)
+
+    if($data -ne $null)
+    {
+        $dataConvertToJSON = ConvertDataToJSON($data)
         
-            if($dataConvertToJSON)
-            {
-                Write-Output "Writing file to: $global:saveLocation"
-                WriteFileToDirectory $dataConvertToJSON $global:saveLocation
+        if($dataConvertToJSON)
+        {
+            Write-Output "Writing file to: $global:saveLocation"
+            WriteFileToDirectory $dataConvertToJSON $global:saveLocation
 
-                CloseIEBrowserProcess($ieObject)
-                Write-Output "Execution complete!"
-            }
-       }
+            DoSignOut($ieObject)
+            CloseIEBrowserProcess($ieObject)
+            Write-Output "Execution complete!"
+        }
     }
 }
 
@@ -67,27 +71,25 @@ function doInputPrompt() {
 }
 
 #does an authentication to the goodreads.com website. Returns an Internet Explorer object.
-function DoWebAuthentication()
+function DoWebAuthentication($ie)
 {
-    $ie = New-Object -com InternetExplorer.Application
-
     if($ie -ne $null) 
-    { 
-
+    {
+        
         $ie.visible=$global:IEVisible
 
-        if(CheckConnection "https://www.goodreads.com") 
+        if(CheckConnection "https://www.goodreads.com/") 
         {
-            $ie.navigate("https://www.goodreads.com")
+            $ie.navigate("https://www.goodreads.com/")
             WaitForPageToLoad($ie)
 
             #check to see if the user is already signed in, if the user is signed in, there shouldn't be a "Sign in" button
             $checkForSignInButton = $ie.document.getElementsByTagName("form") | ? {$_.id -eq 'sign_in'}
 
-            if($checkForSignInButton -ne $null) #if there is not a sign in button, then the user is currently signed in already (maybe with another account). Force a sign out
-            {
-                if(CheckConnection "https://www.goodreads.com/user/sign_in") 
-                {
+            if($checkForSignInButton -eq $null) {
+                DoSignOut($ie)  
+            }
+
                     $ie.navigate("https://www.goodreads.com/user/sign_in") 
                     WaitForPageToLoad($ie)
 
@@ -99,26 +101,25 @@ function DoWebAuthentication()
                     if($submit)
                     {
                         $submit.click()
-                    }
-                }
-            }
 
-            WaitForPageToLoad($ie)
-            $checkIfSignInError = $ie.document.getElementsByClassName("flash error")
+    
+                            Start-Sleep -seconds 4 #from testing, we need an ample amount of time for loading the page after sign-in
 
-            if($checkIfSignInError -ne $null) 
-            {
-                Write-Output $checkIfSignInError | SELECT InnerHTML
-                return $null
-            } 
-            else 
-            {
-                #once authenticated, return $ie to be used in other functions
-                return $ie
+                             $checkSignInButton = $ie.document.getElementsByTagName("input") | ? { $_.name -eq "next"} #this is the submit button
+
+                            if($checkSignInButton -ne $null)
+                            {
+                                return $false
+                            } 
+                            else 
+                            {
+                                #once authenticated, return $ie to be used in other functions
+                                return $true
+                            }
+                        }
             }
         }
-    }
-    return $null
+    return $false
 }
 
 #closes the IE Browser process
@@ -137,21 +138,45 @@ function WaitForPageToLoad($ie)
 {
     if($ie -ne $null) 
     {
-        $timeToWait = 500; #this sets the time to wait between checks for ReadyState (in milliseconds)
-        $count = 0;
-        while($ie.ReadyState -ne 4) 
+        $timeToWait = 1; #this sets the time to wait between checks for ReadyState (in seconds)
+        $exit = $false
+
+        Do
         {
-
-            if($count -eq ($timeToWait * 10)) #if we try 10 times to load the page and it fails, we exit here
+            if($ie.ReadyState -eq 4)
             {
-                Write-Output "There was a problem accessing a page on goodreads.com. Please try again later."
-                Write-Output "==Exiting script=="
-                exit
+                $exit = $true
+            } 
+
+            Start-Sleep -seconds $timeToWait
+
+        }
+        Until($exit)
+    }
+}
+
+function DoSignOut($ie)
+{
+    if($ie -ne $null)
+    {
+        if(CheckConnection "https://www.goodreads.com/user/sign_out")
+        {
+            $ie.navigate("https://www.goodreads.com/user/sign_out")
+            WaitForPageToLoad($ie)
+
+            $signOutContainer = $ie.document.getElementsByClassName("intro") | %{
+                
+                $signOutLink = $_.getElementsByTagName("a")| ? { $_.innerText -Match "click here."}
+
+                if($signOutLink -ne $null)
+                {
+                    $signOutLink.click()
+                    WaitForPageToLoad($ie)
+
+                    $ie.navigate("https://www.goodreads.com")
+                    WaitForPageToLoad($ie)
+                }
             }
-
-            Start-Sleep -Milliseconds $timeToWait #sleep so we can wait for the page to load and recheck
-
-            $count++
         }
     }
 }
@@ -162,6 +187,8 @@ function LookForMarkTwainQuotes($ie)
 {
     if($ie -ne $null)
     {
+        Write-Output "Retrieving data..."
+
         if(CheckConnection "https://www.goodreads.com/search?q=mark+twain&search%5Bsource%5D=goodreads&search_type=quotes&tab=quotes")
         {
             $ie.navigate("https://www.goodreads.com/search?q=mark+twain&search%5Bsource%5D=goodreads&search_type=quotes&tab=quotes") #does a redirect to the quotes page
